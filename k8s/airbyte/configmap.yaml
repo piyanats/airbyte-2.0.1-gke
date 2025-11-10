@@ -1,0 +1,67 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: airbyte-env
+  namespace: airbyte
+  labels:
+    app.kubernetes.io/name: airbyte
+    app.kubernetes.io/component: configmap
+data:
+  # Airbyte Version
+  AIRBYTE_VERSION: "2.0.1"
+
+  # API Configuration
+  INTERNAL_API_HOST: "airbyte-server-svc:8001"
+  WEBAPP_URL: "http://airbyte-webapp-svc:8000"
+
+  # Database Configuration
+  # For internal PostgreSQL:
+  DATABASE_HOST: "airbyte-db-svc"
+  DATABASE_PORT: "5432"
+  # For external database (Cloud SQL):
+  # DATABASE_HOST: "10.x.x.x"  # Cloud SQL private IP
+
+  # Storage Configuration - Minio
+  MINIO_ENDPOINT: "http://airbyte-minio-svc:9000"
+  S3_PATH_STYLE_ACCESS: "true"
+  STATE_STORAGE_MINIO_BUCKET_NAME: "airbyte-state"
+  STATE_STORAGE_MINIO_ENDPOINT: "http://airbyte-minio-svc:9000"
+
+  # For GCS (uncomment and configure):
+  # STATE_STORAGE_TYPE: "GCS"
+  # STATE_STORAGE_GCS_BUCKET_NAME: "your-bucket-name"
+  # STATE_STORAGE_GCS_APPLICATION_CREDENTIALS: "/secrets/gcs-credentials.json"
+
+  # Worker Configuration
+  WORKER_ENVIRONMENT: "kubernetes"
+  MAX_SYNC_WORKERS: "5"
+  MAX_SPEC_WORKERS: "5"
+  MAX_CHECK_WORKERS: "5"
+  MAX_DISCOVER_WORKERS: "5"
+
+  # Job Configuration
+  SYNC_JOB_MAX_ATTEMPTS: "3"
+  SYNC_JOB_MAX_TIMEOUT_DAYS: "3"
+  JOB_MAIN_CONTAINER_CPU_REQUEST: "1"
+  JOB_MAIN_CONTAINER_CPU_LIMIT: "2"
+  JOB_MAIN_CONTAINER_MEMORY_REQUEST: "2Gi"
+  JOB_MAIN_CONTAINER_MEMORY_LIMIT: "4Gi"
+
+  # Logging
+  LOG_LEVEL: "INFO"
+
+  # Tracking
+  TRACKING_STRATEGY: "anonymous"
+  # Set to "disabled" to completely disable tracking
+
+  # Temporal (workflow engine)
+  TEMPORAL_HOST: "airbyte-temporal:7233"
+
+  # Connector Configuration
+  CONNECTOR_REGISTRY_BASE_URL: "https://connectors.airbyte.com"
+
+  # Feature Flags
+  AUTO_DETECT_SCHEMA: "true"
+
+  # Web App Configuration
+  API_URL: "/api/public/v1"

@@ -1,0 +1,217 @@
+# ⚠️⚠️⚠️ WARNING: THIS FILE IS NON-FUNCTIONAL ⚠️⚠️⚠️
+#
+# Docker Compose was DEPRECATED by Airbyte in August 2024
+# This file is FOR REFERENCE ONLY to understand the architecture
+#
+# WHY THIS DOESN'T WORK:
+# - Airbyte does NOT publish Docker images to Docker Hub
+# - Images like airbyte/server, airbyte/worker DO NOT EXIST publicly
+# - Docker Compose deployment is officially unsupported
+#
+# FOR LOCAL DEVELOPMENT USE:
+# abctl (Airbyte's official CLI)
+# See LOCAL_DEVELOPMENT.md for instructions
+#
+# ⚠️⚠️⚠️ DO NOT TRY TO RUN THIS FILE ⚠️⚠️⚠️
+
+version: "3.8"
+
+services:
+  # ============================================
+  # Database (PostgreSQL)
+  # ============================================
+  db:
+    image: postgres:13-alpine
+    container_name: airbyte-db
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ${DATABASE_USER:-airbyte}
+      POSTGRES_PASSWORD: ${DATABASE_PASSWORD:-airbyte}
+      POSTGRES_DB: ${DATABASE_DB:-airbyte}
+    volumes:
+      - db-data:/var/lib/postgresql/data
+    networks:
+      - airbyte-network
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U airbyte"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # ============================================
+  # Object Storage (Minio)
+  # ============================================
+  minio:
+    image: minio/minio:latest
+    container_name: airbyte-minio
+    restart: unless-stopped
+    command: server /data --console-address ":9001"
+    environment:
+      MINIO_ROOT_USER: ${MINIO_ACCESS_KEY:-minio}
+      MINIO_ROOT_PASSWORD: ${MINIO_SECRET_KEY:-minio123}
+    volumes:
+      - minio-data:/data
+    ports:
+      - "9000:9000"
+      - "9001:9001"
+    networks:
+      - airbyte-network
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:9000/minio/health/live"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # ============================================
+  # Airbyte Server
+  # ⚠️ THIS IMAGE DOES NOT EXIST PUBLICLY
+  # ============================================
+  server:
+    # THIS IMAGE IS NOT AVAILABLE ON DOCKER HUB
+    image: airbyte/server:${AIRBYTE_VERSION:-2.0.1}
+    container_name: airbyte-server
+    restart: unless-stopped
+    depends_on:
+      db:
+        condition: service_healthy
+      minio:
+        condition: service_healthy
+    environment:
+      # Database
+      DATABASE_HOST: db
+      DATABASE_PORT: 5432
+      DATABASE_DB: ${DATABASE_DB:-airbyte}
+      DATABASE_USER: ${DATABASE_USER:-airbyte}
+      DATABASE_PASSWORD: ${DATABASE_PASSWORD:-airbyte}
+
+      # Minio
+      MINIO_ENDPOINT: http://minio:9000
+      AWS_ACCESS_KEY_ID: ${MINIO_ACCESS_KEY:-minio}
+      AWS_SECRET_ACCESS_KEY: ${MINIO_SECRET_KEY:-minio123}
+      S3_PATH_STYLE_ACCESS: "true"
+
+      # Airbyte
+      AIRBYTE_VERSION: ${AIRBYTE_VERSION:-2.0.1}
+      INTERNAL_API_HOST: server:8001
+      WORKER_ENVIRONMENT: docker
+      TRACKING_STRATEGY: ${TRACKING_STRATEGY:-anonymous}
+
+      # Logging
+      LOG_LEVEL: ${LOG_LEVEL:-INFO}
+    ports:
+      - "8001:8001"
+    networks:
+      - airbyte-network
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8001/v1/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 60s
+
+  # ============================================
+  # Airbyte Worker
+  # ⚠️ THIS IMAGE DOES NOT EXIST PUBLICLY
+  # ============================================
+  worker:
+    # THIS IMAGE IS NOT AVAILABLE ON DOCKER HUB
+    image: airbyte/worker:${AIRBYTE_VERSION:-2.0.1}
+    container_name: airbyte-worker
+    restart: unless-stopped
+    depends_on:
+      - server
+    environment:
+      # Server Connection
+      INTERNAL_API_HOST: server:8001
+
+      # Database
+      DATABASE_HOST: db
+      DATABASE_PORT: 5432
+      DATABASE_DB: ${DATABASE_DB:-airbyte}
+      DATABASE_USER: ${DATABASE_USER:-airbyte}
+      DATABASE_PASSWORD: ${DATABASE_PASSWORD:-airbyte}
+
+      # Minio
+      MINIO_ENDPOINT: http://minio:9000
+      AWS_ACCESS_KEY_ID: ${MINIO_ACCESS_KEY:-minio}
+      AWS_SECRET_ACCESS_KEY: ${MINIO_SECRET_KEY:-minio123}
+      S3_PATH_STYLE_ACCESS: "true"
+
+      # Worker Configuration
+      MAX_SYNC_WORKERS: ${MAX_SYNC_WORKERS:-5}
+      MAX_SPEC_WORKERS: ${MAX_SPEC_WORKERS:-5}
+      MAX_CHECK_WORKERS: ${MAX_CHECK_WORKERS:-5}
+      SYNC_JOB_MAX_ATTEMPTS: ${SYNC_JOB_MAX_ATTEMPTS:-3}
+      SYNC_JOB_MAX_TIMEOUT_DAYS: ${SYNC_JOB_MAX_TIMEOUT_DAYS:-3}
+
+      # Environment
+      WORKER_ENVIRONMENT: docker
+      LOG_LEVEL: ${LOG_LEVEL:-INFO}
+    volumes:
+      # Mount Docker socket for running connectors
+      - /var/run/docker.sock:/var/run/docker.sock
+      - workspace:/tmp/workspace
+    networks:
+      - airbyte-network
+
+  # ============================================
+  # Airbyte Webapp
+  # ⚠️ THIS IMAGE DOES NOT EXIST PUBLICLY
+  # ============================================
+  webapp:
+    # THIS IMAGE IS NOT AVAILABLE ON DOCKER HUB
+    image: airbyte/webapp:${AIRBYTE_VERSION:-2.0.1}
+    container_name: airbyte-webapp
+    restart: unless-stopped
+    depends_on:
+      - server
+    environment:
+      # Server Connection
+      INTERNAL_API_HOST: server:8001
+
+      # Basic Authentication
+      BASIC_AUTH_USERNAME: ${BASIC_AUTH_USERNAME:-airbyte}
+      BASIC_AUTH_PASSWORD: ${BASIC_AUTH_PASSWORD:-password}
+
+      # Tracking
+      TRACKING_STRATEGY: ${TRACKING_STRATEGY:-anonymous}
+    ports:
+      - "8000:8000"
+    networks:
+      - airbyte-network
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 30s
+
+# ============================================
+# Networks
+# ============================================
+networks:
+  airbyte-network:
+    driver: bridge
+
+# ============================================
+# Volumes
+# ============================================
+volumes:
+  db-data:
+    driver: local
+  minio-data:
+    driver: local
+  workspace:
+    driver: local
+
+# ============================================
+# USAGE (REMINDER - THIS WON'T WORK!)
+# ============================================
+# ⚠️ AGAIN: This file will NOT work!
+#
+# Instead, use abctl:
+#   curl -LsfS https://get.airbyte.com | bash -
+#   abctl local install
+#
+# See LOCAL_DEVELOPMENT.md for complete instructions
+# ============================================

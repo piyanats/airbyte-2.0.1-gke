@@ -1,0 +1,156 @@
+apiVersion: batch/v1
+kind: CronJob
+metadata:
+  name: airbyte-backup-v2
+  namespace: airbyte
+  labels:
+    app: airbyte-backup
+    app.kubernetes.io/name: airbyte
+    app.kubernetes.io/component: backup-cronjob
+spec:
+  # Schedule: Daily at 2 AM UTC
+  schedule: "0 2 * * *"
+  successfulJobsHistoryLimit: 3
+  failedJobsHistoryLimit: 3
+  concurrencyPolicy: Forbid
+  jobTemplate:
+    spec:
+      backoffLimit: 2
+      template:
+        metadata:
+          labels:
+            app: airbyte-backup
+        spec:
+          serviceAccountName: airbyte-sa
+          restartPolicy: OnFailure
+          containers:
+          - name: backup
+            image: curlimages/curl:latest
+            command:
+            - /bin/sh
+            - -c
+            - |
+              #!/bin/sh
+              set -e
+
+              echo "Starting Airbyte backup..."
+
+              # Configuration
+              API_HOST="http://airbyte-server-svc:8001"
+              TIMESTAMP=$(date +%Y%m%d_%H%M%S)
+              BACKUP_DIR="/backups"
+              BACKUP_FILE="${BACKUP_DIR}/airbyte_backup_v2_${TIMESTAMP}.tar.gz"
+
+              # Create backup directory
+              mkdir -p ${BACKUP_DIR}/tmp
+
+              # Export workspaces
+              echo "Exporting workspaces..."
+              curl -s -H "Authorization: Bearer ${AIRBYTE_API_TOKEN}" \
+                "${API_HOST}/api/public/v1/workspaces" \
+                > ${BACKUP_DIR}/tmp/workspaces.json
+
+              # Export sources
+              echo "Exporting sources..."
+              curl -s -H "Authorization: Bearer ${AIRBYTE_API_TOKEN}" \
+                "${API_HOST}/api/public/v1/sources" \
+                > ${BACKUP_DIR}/tmp/sources.json
+
+              # Export destinations
+              echo "Exporting destinations..."
+              curl -s -H "Authorization: Bearer ${AIRBYTE_API_TOKEN}" \
+                "${API_HOST}/api/public/v1/destinations" \
+                > ${BACKUP_DIR}/tmp/destinations.json
+
+              # Export connections
+              echo "Exporting connections..."
+              curl -s -H "Authorization: Bearer ${AIRBYTE_API_TOKEN}" \
+                "${API_HOST}/api/public/v1/connections" \
+                > ${BACKUP_DIR}/tmp/connections.json
+
+              # Create tar archive
+              echo "Creating backup archive..."
+              cd ${BACKUP_DIR}/tmp
+              tar -czf ${BACKUP_FILE} *.json
+
+              # Cleanup
+              rm -rf ${BACKUP_DIR}/tmp
+
+              echo "Backup completed: ${BACKUP_FILE}"
+              ls -lh ${BACKUP_FILE}
+
+              # Optional: Upload to GCS
+              # if command -v gsutil &> /dev/null; then
+              #   echo "Uploading to GCS..."
+              #   gsutil cp ${BACKUP_FILE} gs://your-bucket/airbyte-backups/
+              # fi
+            env:
+            - name: AIRBYTE_API_TOKEN
+              valueFrom:
+                secretKeyRef:
+                  name: airbyte-api-token
+                  key: token
+            volumeMounts:
+            - name: backup-storage
+              mountPath: /backups
+            resources:
+              requests:
+                cpu: "100m"
+                memory: "128Mi"
+              limits:
+                cpu: "500m"
+                memory: "512Mi"
+          volumes:
+          - name: backup-storage
+            persistentVolumeClaim:
+              claimName: airbyte-backup-pvc
+
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: airbyte-backup-pvc
+  namespace: airbyte
+  labels:
+    app: airbyte-backup
+    app.kubernetes.io/name: airbyte
+    app.kubernetes.io/component: backup-storage
+spec:
+  accessModes:
+  - ReadWriteOnce
+  resources:
+    requests:
+      storage: 10Gi
+  # Uncomment for specific storage class:
+  # storageClassName: standard-rwo
+
+---
+# Setup Instructions:
+#
+# 1. Create API token in Airbyte UI:
+#    Settings → Account → Applications → New Application
+#
+# 2. Create secret with API token:
+#    kubectl create secret generic airbyte-api-token \
+#      -n airbyte \
+#      --from-literal=token='your-api-token-here'
+#
+# 3. Apply this manifest:
+#    kubectl apply -f backup-cronjob-v2.yaml
+#
+# 4. Test the CronJob:
+#    kubectl create job --from=cronjob/airbyte-backup-v2 test-backup -n airbyte
+#    kubectl logs -n airbyte job/test-backup
+#
+# 5. Check backups:
+#    kubectl exec -it -n airbyte <backup-pod> -- ls -lh /backups
+#
+# Optional: Configure GCS upload
+# - Add gsutil to the container image
+# - Configure Workload Identity with storage.objectAdmin role
+# - Uncomment GCS upload section in the script
+#
+# Schedule Options:
+# - "0 2 * * *"    # Daily at 2 AM
+# - "0 */6 * * *"  # Every 6 hours
+# - "0 0 * * 0"    # Weekly (Sunday at midnight)

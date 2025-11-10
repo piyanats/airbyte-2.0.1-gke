@@ -1,0 +1,75 @@
+apiVersion: v1
+kind: ResourceQuota
+metadata:
+  name: airbyte-resource-quota
+  namespace: airbyte
+  labels:
+    app.kubernetes.io/name: airbyte
+    app.kubernetes.io/component: resource-quota
+spec:
+  hard:
+    # CPU Limits
+    requests.cpu: "10"
+    limits.cpu: "20"
+
+    # Memory Limits
+    requests.memory: "20Gi"
+    limits.memory: "40Gi"
+
+    # Storage Limits
+    requests.storage: "500Gi"
+
+    # Resource Counts
+    persistentvolumeclaims: "10"
+    pods: "50"
+    services: "20"
+    configmaps: "20"
+    secrets: "20"
+
+---
+apiVersion: v1
+kind: LimitRange
+metadata:
+  name: airbyte-limit-range
+  namespace: airbyte
+  labels:
+    app.kubernetes.io/name: airbyte
+    app.kubernetes.io/component: limit-range
+spec:
+  limits:
+  # Default limits for containers
+  - default:
+      cpu: "1"
+      memory: "1Gi"
+    defaultRequest:
+      cpu: "500m"
+      memory: "512Mi"
+    max:
+      cpu: "4"
+      memory: "8Gi"
+    min:
+      cpu: "100m"
+      memory: "128Mi"
+    type: Container
+
+  # Limits for PVCs
+  - max:
+      storage: "200Gi"
+    min:
+      storage: "1Gi"
+    type: PersistentVolumeClaim
+
+---
+# Notes:
+#
+# ResourceQuota:
+# - Prevents resource exhaustion in the namespace
+# - Limits total CPU, memory, and storage
+# - Limits number of resources (pods, PVCs, etc.)
+#
+# LimitRange:
+# - Sets default resource requests/limits for containers
+# - Enforces minimum and maximum resource boundaries
+# - Applies to containers that don't specify their own limits
+#
+# Adjust these values based on your cluster capacity and workload requirements.

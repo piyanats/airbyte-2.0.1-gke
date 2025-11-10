@@ -1,0 +1,109 @@
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: airbyte-db
+  namespace: airbyte
+  labels:
+    app: airbyte-db
+    app.kubernetes.io/name: airbyte
+    app.kubernetes.io/component: database
+spec:
+  serviceName: airbyte-db-svc
+  replicas: 1
+  selector:
+    matchLabels:
+      app: airbyte-db
+  template:
+    metadata:
+      labels:
+        app: airbyte-db
+        app.kubernetes.io/name: airbyte
+        app.kubernetes.io/component: database
+    spec:
+      containers:
+      - name: postgres
+        image: postgres:13-alpine
+        ports:
+        - containerPort: 5432
+          name: postgresql
+          protocol: TCP
+        env:
+        - name: POSTGRES_USER
+          valueFrom:
+            secretKeyRef:
+              name: airbyte-secrets
+              key: DATABASE_USER
+        - name: POSTGRES_PASSWORD
+          valueFrom:
+            secretKeyRef:
+              name: airbyte-secrets
+              key: DATABASE_PASSWORD
+        - name: POSTGRES_DB
+          valueFrom:
+            secretKeyRef:
+              name: airbyte-secrets
+              key: DATABASE_DB
+        - name: PGDATA
+          value: /var/lib/postgresql/data/pgdata
+        resources:
+          requests:
+            cpu: "500m"
+            memory: "1Gi"
+          limits:
+            cpu: "1"
+            memory: "2Gi"
+        livenessProbe:
+          exec:
+            command:
+            - pg_isready
+            - -U
+            - airbyte
+          initialDelaySeconds: 30
+          periodSeconds: 10
+          timeoutSeconds: 5
+          failureThreshold: 3
+        readinessProbe:
+          exec:
+            command:
+            - pg_isready
+            - -U
+            - airbyte
+          initialDelaySeconds: 10
+          periodSeconds: 10
+          timeoutSeconds: 5
+          failureThreshold: 3
+        volumeMounts:
+        - name: data
+          mountPath: /var/lib/postgresql/data
+      restartPolicy: Always
+  volumeClaimTemplates:
+  - metadata:
+      name: data
+      labels:
+        app: airbyte-db
+    spec:
+      accessModes:
+      - ReadWriteOnce
+      resources:
+        requests:
+          storage: 50Gi
+      # Uncomment and modify for specific storage class:
+      # storageClassName: standard-rwo
+      # For better performance, use SSD:
+      # storageClassName: premium-rwo
+
+---
+# Notes:
+#
+# This PostgreSQL deployment is for DEVELOPMENT/TESTING.
+# For PRODUCTION, use Cloud SQL or external managed PostgreSQL.
+#
+# Benefits of Cloud SQL:
+# - Automated backups
+# - High availability
+# - Automatic failover
+# - Managed updates
+# - Better performance
+# - Point-in-time recovery
+#
+# See EXTERNAL_DATABASE.md for instructions on using Cloud SQL.

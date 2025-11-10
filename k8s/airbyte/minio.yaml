@@ -1,0 +1,95 @@
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: airbyte-minio
+  namespace: airbyte
+  labels:
+    app: airbyte-minio
+    app.kubernetes.io/name: airbyte
+    app.kubernetes.io/component: minio
+spec:
+  serviceName: airbyte-minio-svc
+  replicas: 1
+  selector:
+    matchLabels:
+      app: airbyte-minio
+  template:
+    metadata:
+      labels:
+        app: airbyte-minio
+        app.kubernetes.io/name: airbyte
+        app.kubernetes.io/component: minio
+    spec:
+      containers:
+      - name: minio
+        image: minio/minio:latest
+        args:
+        - server
+        - /data
+        - --console-address
+        - ":9001"
+        ports:
+        - containerPort: 9000
+          name: api
+          protocol: TCP
+        - containerPort: 9001
+          name: console
+          protocol: TCP
+        env:
+        - name: MINIO_ROOT_USER
+          valueFrom:
+            secretKeyRef:
+              name: airbyte-secrets
+              key: MINIO_ACCESS_KEY
+        - name: MINIO_ROOT_PASSWORD
+          valueFrom:
+            secretKeyRef:
+              name: airbyte-secrets
+              key: MINIO_SECRET_KEY
+        resources:
+          requests:
+            cpu: "500m"
+            memory: "1Gi"
+          limits:
+            cpu: "1"
+            memory: "2Gi"
+        livenessProbe:
+          httpGet:
+            path: /minio/health/live
+            port: 9000
+          initialDelaySeconds: 30
+          periodSeconds: 10
+          timeoutSeconds: 5
+          failureThreshold: 3
+        readinessProbe:
+          httpGet:
+            path: /minio/health/ready
+            port: 9000
+          initialDelaySeconds: 10
+          periodSeconds: 10
+          timeoutSeconds: 5
+          failureThreshold: 3
+        volumeMounts:
+        - name: data
+          mountPath: /data
+      restartPolicy: Always
+  volumeClaimTemplates:
+  - metadata:
+      name: data
+      labels:
+        app: airbyte-minio
+    spec:
+      accessModes:
+      - ReadWriteOnce
+      resources:
+        requests:
+          storage: 100Gi
+      # Uncomment and modify for specific storage class:
+      # storageClassName: standard-rwo
+
+---
+# Notes:
+# - Minio provides S3-compatible object storage
+# - Stores sync state and temporary data
+# - For production, consider using Google Cloud Storage (GCS) instead
+# - To use GCS, update configmap.yaml with GCS configuration

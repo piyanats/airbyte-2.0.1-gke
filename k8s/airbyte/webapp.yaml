@@ -1,0 +1,94 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: airbyte-webapp
+  namespace: airbyte
+  labels:
+    app: airbyte-webapp
+    app.kubernetes.io/name: airbyte
+    app.kubernetes.io/component: webapp
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: airbyte-webapp
+  strategy:
+    type: RollingUpdate
+    rollingUpdate:
+      maxSurge: 1
+      maxUnavailable: 0
+  template:
+    metadata:
+      labels:
+        app: airbyte-webapp
+        app.kubernetes.io/name: airbyte
+        app.kubernetes.io/component: webapp
+    spec:
+      serviceAccountName: airbyte-sa
+      containers:
+      - name: airbyte-webapp
+        image: airbyte/webapp:2.0.1
+        imagePullPolicy: IfNotPresent
+        ports:
+        - name: http
+          containerPort: 8000
+          protocol: TCP
+        env:
+        # Server Connection
+        - name: INTERNAL_API_HOST
+          valueFrom:
+            configMapKeyRef:
+              name: airbyte-env
+              key: INTERNAL_API_HOST
+
+        # Basic Authentication
+        - name: BASIC_AUTH_USERNAME
+          valueFrom:
+            secretKeyRef:
+              name: airbyte-secrets
+              key: BASIC_AUTH_USERNAME
+        - name: BASIC_AUTH_PASSWORD
+          valueFrom:
+            secretKeyRef:
+              name: airbyte-secrets
+              key: BASIC_AUTH_PASSWORD
+
+        # Application Configuration
+        - name: TRACKING_STRATEGY
+          valueFrom:
+            configMapKeyRef:
+              name: airbyte-env
+              key: TRACKING_STRATEGY
+        - name: API_URL
+          valueFrom:
+            configMapKeyRef:
+              name: airbyte-env
+              key: API_URL
+
+        resources:
+          requests:
+            cpu: "250m"
+            memory: "512Mi"
+          limits:
+            cpu: "500m"
+            memory: "1Gi"
+
+        livenessProbe:
+          httpGet:
+            path: /
+            port: 8000
+          initialDelaySeconds: 30
+          periodSeconds: 10
+          timeoutSeconds: 5
+          failureThreshold: 3
+
+        readinessProbe:
+          httpGet:
+            path: /
+            port: 8000
+          initialDelaySeconds: 10
+          periodSeconds: 10
+          timeoutSeconds: 5
+          failureThreshold: 3
+
+      restartPolicy: Always

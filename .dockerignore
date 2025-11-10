@@ -1,0 +1,87 @@
+# Git
+.git
+.gitignore
+.gitattributes
+
+# Documentation
+*.md
+docs/
+LICENSE
+
+# CI/CD
+.github/
+.gitlab-ci.yml
+.travis.yml
+Jenkinsfile
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# Environment
+.env
+.env.*
+!.env.example
+
+# Backups
+backups/
+*.tar.gz
+*.sql
+*.dump
+
+# Logs
+logs/
+*.log
+
+# Temporary Files
+tmp/
+temp/
+*.tmp
+
+# OS Files
+.DS_Store
+Thumbs.db
+
+# Test Files
+test/
+tests/
+*_test.go
+*_test.py
+*.test.js
+
+# Node
+node_modules/
+npm-debug.log
+
+# Python
+__pycache__/
+*.py[cod]
+venv/
+.Python
+
+# Build Artifacts
+dist/
+build/
+
+# Kubernetes (for Docker builds, we don't need k8s manifests)
+k8s/
+
+# Scripts (may not be needed in Docker image)
+scripts/
+
+# Credentials
+*.json
+*.pem
+*.key
+gcp-key.json
+
+# Coverage
+coverage/
+.coverage
+htmlcov/
+
+# Workspace
+workspace/

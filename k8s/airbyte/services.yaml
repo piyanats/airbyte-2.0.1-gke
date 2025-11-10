@@ -1,0 +1,82 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: airbyte-webapp-svc
+  namespace: airbyte
+  labels:
+    app: airbyte-webapp
+    app.kubernetes.io/name: airbyte
+    app.kubernetes.io/component: webapp-service
+spec:
+  type: ClusterIP
+  ports:
+  - port: 8000
+    targetPort: 8000
+    protocol: TCP
+    name: http
+  selector:
+    app: airbyte-webapp
+
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: airbyte-server-svc
+  namespace: airbyte
+  labels:
+    app: airbyte-server
+    app.kubernetes.io/name: airbyte
+    app.kubernetes.io/component: server-service
+spec:
+  type: ClusterIP
+  ports:
+  - port: 8001
+    targetPort: 8001
+    protocol: TCP
+    name: http
+  selector:
+    app: airbyte-server
+
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: airbyte-db-svc
+  namespace: airbyte
+  labels:
+    app: airbyte-db
+    app.kubernetes.io/name: airbyte
+    app.kubernetes.io/component: database-service
+spec:
+  type: ClusterIP
+  ports:
+  - port: 5432
+    targetPort: 5432
+    protocol: TCP
+    name: postgresql
+  selector:
+    app: airbyte-db
+
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: airbyte-minio-svc
+  namespace: airbyte
+  labels:
+    app: airbyte-minio
+    app.kubernetes.io/name: airbyte
+    app.kubernetes.io/component: minio-service
+spec:
+  type: ClusterIP
+  ports:
+  - port: 9000
+    targetPort: 9000
+    protocol: TCP
+    name: api
+  - port: 9001
+    targetPort: 9001
+    protocol: TCP
+    name: console
+  selector:
+    app: airbyte-minio

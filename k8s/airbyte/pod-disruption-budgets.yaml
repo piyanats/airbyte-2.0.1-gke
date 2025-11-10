@@ -1,0 +1,47 @@
+apiVersion: policy/v1
+kind: PodDisruptionBudget
+metadata:
+  name: airbyte-server-pdb
+  namespace: airbyte
+  labels:
+    app: airbyte-server
+    app.kubernetes.io/name: airbyte
+    app.kubernetes.io/component: pdb
+spec:
+  minAvailable: 1
+  selector:
+    matchLabels:
+      app: airbyte-server
+
+---
+apiVersion: policy/v1
+kind: PodDisruptionBudget
+metadata:
+  name: airbyte-worker-pdb
+  namespace: airbyte
+  labels:
+    app: airbyte-worker
+    app.kubernetes.io/name: airbyte
+    app.kubernetes.io/component: pdb
+spec:
+  minAvailable: 1
+  selector:
+    matchLabels:
+      app: airbyte-worker
+
+---
+# Notes:
+#
+# PodDisruptionBudgets ensure high availability during:
+# - Node maintenance
+# - Cluster upgrades
+# - Voluntary pod evictions
+#
+# minAvailable: 1 ensures at least one pod is always running
+#
+# For higher availability, scale deployments and increase minAvailable:
+# - replicas: 3, minAvailable: 2
+# - replicas: 5, minAvailable: 3
+#
+# Or use maxUnavailable instead:
+# maxUnavailable: 1  # Allow at most 1 pod to be unavailable

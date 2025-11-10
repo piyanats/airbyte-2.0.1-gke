@@ -1,0 +1,156 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: airbyte-worker
+  namespace: airbyte
+  labels:
+    app: airbyte-worker
+    app.kubernetes.io/name: airbyte
+    app.kubernetes.io/component: worker
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: airbyte-worker
+  strategy:
+    type: RollingUpdate
+    rollingUpdate:
+      maxSurge: 1
+      maxUnavailable: 0
+  template:
+    metadata:
+      labels:
+        app: airbyte-worker
+        app.kubernetes.io/name: airbyte
+        app.kubernetes.io/component: worker
+    spec:
+      serviceAccountName: airbyte-sa
+      containers:
+      - name: airbyte-worker
+        image: airbyte/worker:2.0.1
+        imagePullPolicy: IfNotPresent
+        env:
+        # Database Configuration
+        - name: DATABASE_HOST
+          valueFrom:
+            configMapKeyRef:
+              name: airbyte-env
+              key: DATABASE_HOST
+        - name: DATABASE_PORT
+          valueFrom:
+            configMapKeyRef:
+              name: airbyte-env
+              key: DATABASE_PORT
+        - name: DATABASE_DB
+          valueFrom:
+            secretKeyRef:
+              name: airbyte-secrets
+              key: DATABASE_DB
+        - name: DATABASE_USER
+          valueFrom:
+            secretKeyRef:
+              name: airbyte-secrets
+              key: DATABASE_USER
+        - name: DATABASE_PASSWORD
+          valueFrom:
+            secretKeyRef:
+              name: airbyte-secrets
+              key: DATABASE_PASSWORD
+
+        # Minio/Storage Configuration
+        - name: MINIO_ENDPOINT
+          valueFrom:
+            configMapKeyRef:
+              name: airbyte-env
+              key: MINIO_ENDPOINT
+        - name: AWS_ACCESS_KEY_ID
+          valueFrom:
+            secretKeyRef:
+              name: airbyte-secrets
+              key: MINIO_ACCESS_KEY
+        - name: AWS_SECRET_ACCESS_KEY
+          valueFrom:
+            secretKeyRef:
+              name: airbyte-secrets
+              key: MINIO_SECRET_KEY
+        - name: S3_PATH_STYLE_ACCESS
+          valueFrom:
+            configMapKeyRef:
+              name: airbyte-env
+              key: S3_PATH_STYLE_ACCESS
+
+        # Server Connection
+        - name: INTERNAL_API_HOST
+          valueFrom:
+            configMapKeyRef:
+              name: airbyte-env
+              key: INTERNAL_API_HOST
+
+        # Worker Configuration
+        - name: WORKER_ENVIRONMENT
+          valueFrom:
+            configMapKeyRef:
+              name: airbyte-env
+              key: WORKER_ENVIRONMENT
+        - name: MAX_SYNC_WORKERS
+          valueFrom:
+            configMapKeyRef:
+              name: airbyte-env
+              key: MAX_SYNC_WORKERS
+        - name: MAX_SPEC_WORKERS
+          valueFrom:
+            configMapKeyRef:
+              name: airbyte-env
+              key: MAX_SPEC_WORKERS
+        - name: MAX_CHECK_WORKERS
+          valueFrom:
+            configMapKeyRef:
+              name: airbyte-env
+              key: MAX_CHECK_WORKERS
+        - name: MAX_DISCOVER_WORKERS
+          valueFrom:
+            configMapKeyRef:
+              name: airbyte-env
+              key: MAX_DISCOVER_WORKERS
+
+        # Job Configuration
+        - name: SYNC_JOB_MAX_ATTEMPTS
+          valueFrom:
+            configMapKeyRef:
+              name: airbyte-env
+              key: SYNC_JOB_MAX_ATTEMPTS
+        - name: SYNC_JOB_MAX_TIMEOUT_DAYS
+          valueFrom:
+            configMapKeyRef:
+              name: airbyte-env
+              key: SYNC_JOB_MAX_TIMEOUT_DAYS
+
+        # Application Configuration
+        - name: AIRBYTE_VERSION
+          valueFrom:
+            configMapKeyRef:
+              name: airbyte-env
+              key: AIRBYTE_VERSION
+        - name: LOG_LEVEL
+          valueFrom:
+            configMapKeyRef:
+              name: airbyte-env
+              key: LOG_LEVEL
+
+        resources:
+          requests:
+            cpu: "1"
+            memory: "2Gi"
+          limits:
+            cpu: "2"
+            memory: "4Gi"
+
+        volumeMounts:
+        - name: workspace
+          mountPath: /tmp/workspace
+
+      volumes:
+      - name: workspace
+        emptyDir: {}
+
+      restartPolicy: Always

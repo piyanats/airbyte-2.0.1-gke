@@ -1,0 +1,139 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: airbyte-server
+  namespace: airbyte
+  labels:
+    app: airbyte-server
+    app.kubernetes.io/name: airbyte
+    app.kubernetes.io/component: server
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: airbyte-server
+  strategy:
+    type: RollingUpdate
+    rollingUpdate:
+      maxSurge: 1
+      maxUnavailable: 0
+  template:
+    metadata:
+      labels:
+        app: airbyte-server
+        app.kubernetes.io/name: airbyte
+        app.kubernetes.io/component: server
+    spec:
+      serviceAccountName: airbyte-sa
+      containers:
+      - name: airbyte-server
+        image: airbyte/server:2.0.1
+        imagePullPolicy: IfNotPresent
+        ports:
+        - name: http
+          containerPort: 8001
+          protocol: TCP
+        env:
+        # Database Configuration
+        - name: DATABASE_HOST
+          valueFrom:
+            configMapKeyRef:
+              name: airbyte-env
+              key: DATABASE_HOST
+        - name: DATABASE_PORT
+          valueFrom:
+            configMapKeyRef:
+              name: airbyte-env
+              key: DATABASE_PORT
+        - name: DATABASE_DB
+          valueFrom:
+            secretKeyRef:
+              name: airbyte-secrets
+              key: DATABASE_DB
+        - name: DATABASE_USER
+          valueFrom:
+            secretKeyRef:
+              name: airbyte-secrets
+              key: DATABASE_USER
+        - name: DATABASE_PASSWORD
+          valueFrom:
+            secretKeyRef:
+              name: airbyte-secrets
+              key: DATABASE_PASSWORD
+
+        # Minio/Storage Configuration
+        - name: MINIO_ENDPOINT
+          valueFrom:
+            configMapKeyRef:
+              name: airbyte-env
+              key: MINIO_ENDPOINT
+        - name: AWS_ACCESS_KEY_ID
+          valueFrom:
+            secretKeyRef:
+              name: airbyte-secrets
+              key: MINIO_ACCESS_KEY
+        - name: AWS_SECRET_ACCESS_KEY
+          valueFrom:
+            secretKeyRef:
+              name: airbyte-secrets
+              key: MINIO_SECRET_KEY
+        - name: S3_PATH_STYLE_ACCESS
+          valueFrom:
+            configMapKeyRef:
+              name: airbyte-env
+              key: S3_PATH_STYLE_ACCESS
+
+        # Application Configuration
+        - name: AIRBYTE_VERSION
+          valueFrom:
+            configMapKeyRef:
+              name: airbyte-env
+              key: AIRBYTE_VERSION
+        - name: INTERNAL_API_HOST
+          valueFrom:
+            configMapKeyRef:
+              name: airbyte-env
+              key: INTERNAL_API_HOST
+        - name: TRACKING_STRATEGY
+          valueFrom:
+            configMapKeyRef:
+              name: airbyte-env
+              key: TRACKING_STRATEGY
+        - name: LOG_LEVEL
+          valueFrom:
+            configMapKeyRef:
+              name: airbyte-env
+              key: LOG_LEVEL
+        - name: WORKER_ENVIRONMENT
+          valueFrom:
+            configMapKeyRef:
+              name: airbyte-env
+              key: WORKER_ENVIRONMENT
+
+        resources:
+          requests:
+            cpu: "1"
+            memory: "2Gi"
+          limits:
+            cpu: "2"
+            memory: "4Gi"
+
+        livenessProbe:
+          httpGet:
+            path: /v1/health
+            port: 8001
+          initialDelaySeconds: 30
+          periodSeconds: 10
+          timeoutSeconds: 5
+          failureThreshold: 3
+
+        readinessProbe:
+          httpGet:
+            path: /v1/health
+            port: 8001
+          initialDelaySeconds: 10
+          periodSeconds: 10
+          timeoutSeconds: 5
+          failureThreshold: 3
+
+      restartPolicy: Always
